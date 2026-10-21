@@ -1,9 +1,9 @@
 from django.urls import path
-from .alpha_views import (
-    AlphaVantageAnalyzeView,
-    AlphaVantageQuoteView,
-    AlphaVantageStatusView,
-    AlphaVantageSymbolSearchView,
+from .yahoo_views import (
+    YahooAnalyzeView,
+    YahooQuoteView,
+    YahooStatusView,
+    YahooSymbolSearchView,
 )
 from .views import PredictView
 from .kite_views import (
@@ -25,8 +25,8 @@ urlpatterns = [
     path('kite/instruments', KiteInstrumentSearchView.as_view(), name='kite-instruments'),
     path('kite/quote', KiteQuoteView.as_view(), name='kite-quote'),
     path('predict/kite', KiteAnalyzeView.as_view(), name='kite-predict'),
-    path('alpha-vantage/status', AlphaVantageStatusView.as_view(), name='alpha-vantage-status'),
-    path('alpha-vantage/symbols', AlphaVantageSymbolSearchView.as_view(), name='alpha-vantage-symbols'),
-    path('alpha-vantage/quote', AlphaVantageQuoteView.as_view(), name='alpha-vantage-quote'),
-    path('predict/alpha-vantage', AlphaVantageAnalyzeView.as_view(), name='alpha-vantage-predict'),
+    path('yahoo/status', YahooStatusView.as_view(), name='yahoo-status'),
+    path('yahoo/symbols', YahooSymbolSearchView.as_view(), name='yahoo-symbols'),
+    path('yahoo/quote', YahooQuoteView.as_view(), name='yahoo-quote'),
+    path('predict/yahoo', YahooAnalyzeView.as_view(), name='yahoo-predict'),
 ]

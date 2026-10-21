@@ -55,7 +55,6 @@ CORS_ALLOW_CREDENTIALS = True
 
 KITE_API_KEY = os.environ.get('KITE_API_KEY', '')
 KITE_API_SECRET = os.environ.get('KITE_API_SECRET', '')
-ALPHA_VANTAGE_API_KEY = os.environ.get('ALPHA_VANTAGE_API_KEY', '')
 
 ROOT_URLCONF = 'backend.urls'
 WSGI_APPLICATION = 'backend.wsgi.application'

@@ -39,7 +39,7 @@ class DataProcessor:
         return macd, signal
 
     def add_indicators(self, data: pd.DataFrame, features: List[str]) -> pd.DataFrame:
-        """Engineer indicator columns without dropping any rows."""
+        """Engineer indicator and statistical feature columns."""
         df = data.copy()
 
         if "Moving Average" in features:
@@ -52,9 +52,34 @@ class DataProcessor:
         if "MACD" in features:
             df['MACD'], df['Signal'] = self.calculate_macd(df)
 
-        # Add basic features
-        df['Returns'] = df['Close'].pct_change()
-        df['Volatility'] = df['Returns'].rolling(window=20).std()
+        close = df['Close'].astype(float)
+        log_return = np.log(close / close.shift(1))
+
+        # Curated always-on features: kept only if they showed stable
+        # predictive rank-IC across a 10-symbol NSE benchmark (|IC| >= 0.025,
+        # sign stability >= 70%). Every feature at t uses data up to t;
+        # the model target is the return from t to t+1.
+        df['LogReturn_10'] = log_return.rolling(window=10).mean()
+
+        if {'High', 'Low'}.issubset(df.columns):
+            previous_close = close.shift(1)
+            true_range = pd.concat(
+                [
+                    df['High'] - df['Low'],
+                    (df['High'] - previous_close).abs(),
+                    (df['Low'] - previous_close).abs(),
+                ],
+                axis=1,
+            ).max(axis=1)
+            df['ATR_14'] = true_range.rolling(window=14).mean()
+            df['HighLowRange'] = (df['High'] - df['Low']) / close
+
+        if 'Open' in df.columns:
+            df['OvernightReturn'] = np.log(df['Open'].astype(float) / close.shift(1))
+
+        if 'Volume' in df.columns:
+            volume = pd.to_numeric(df['Volume'], errors='coerce')
+            df['VolumeSMA_ratio'] = volume / volume.rolling(window=20).mean()
 
         return df
 

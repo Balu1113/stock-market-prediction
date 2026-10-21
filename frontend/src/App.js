@@ -120,17 +120,15 @@ function App() {
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [source, setSource] = useState("csv");
-  const [modelType, setModelType] = useState("Linear Regression");
+  const [modelType, setModelType] = useState("Ridge Regression");
   const [features, setFeatures] = useState([]);
   const [trainSize, setTrainSize] = useState(80);
   const [predictionDays, setPredictionDays] = useState(7);
   const [simulateTrading, setSimulateTrading] = useState(false);
   const [initialCapital, setInitialCapital] = useState(10000);
-  const [alphaConfigured, setAlphaConfigured] = useState(false);
-  const [alphaSearchQuery, setAlphaSearchQuery] = useState("");
-  const [alphaSymbols, setAlphaSymbols] = useState([]);
-  const [alphaSymbol, setAlphaSymbol] = useState("");
-  const [alphaCurrency, setAlphaCurrency] = useState("");
+  const [yahooSearchQuery, setYahooSearchQuery] = useState("");
+  const [yahooSymbols, setYahooSymbols] = useState([]);
+  const [yahooSymbol, setYahooSymbol] = useState("");
   const [kiteConfigured, setKiteConfigured] = useState(false);
   const [kiteConnected, setKiteConnected] = useState(false);
   const [kiteUserName, setKiteUserName] = useState("");
@@ -170,29 +168,21 @@ function App() {
       .catch(() =>
         setKiteMessage("Start the Django backend to use Kite Connect."),
       );
-
-    axios
-      .get(`${API_BASE}/alpha-vantage/status`)
-      .then(({ data }) => setAlphaConfigured(data.configured))
-      .catch(() => {});
   }, []);
 
   const fetchLivePrice = useCallback(async () => {
-    if (source === "alpha") {
-      if (!alphaSymbol) {
+    if (source === "yahoo") {
+      if (!yahooSymbol) {
         setLivePrice(null);
         return;
       }
       setLiveLoading(true);
       setLiveError("");
       try {
-        const { data } = await axios.get(`${API_BASE}/alpha-vantage/quote`, {
-          params: { symbol: alphaSymbol },
+        const { data } = await axios.get(`${API_BASE}/yahoo/quote`, {
+          params: { symbol: yahooSymbol },
         });
-        setLivePrice({
-          ...data,
-          currency: alphaCurrency || data.currency || "",
-        });
+        setLivePrice({ ...data, currency: data.currency || "INR" });
       } catch (requestError) {
         setLivePrice(null);
         setLiveError(
@@ -233,8 +223,7 @@ function App() {
     }
   }, [
     source,
-    alphaSymbol,
-    alphaCurrency,
+    yahooSymbol,
     kiteConnected,
     selectedInstrument,
     exchange,
@@ -246,12 +235,12 @@ function App() {
 
   useEffect(() => {
     const ready =
-      (source === "alpha" && alphaSymbol) ||
+      (source === "yahoo" && yahooSymbol) ||
       (source === "kite" && kiteConnected && selectedInstrument);
     if (!ready) return undefined;
     const timer = window.setInterval(fetchLivePrice, 30000);
     return () => window.clearInterval(timer);
-  }, [fetchLivePrice, source, alphaSymbol, kiteConnected, selectedInstrument]);
+  }, [fetchLivePrice, source, yahooSymbol, kiteConnected, selectedInstrument]);
 
   const handleFeatureChange = (e) => {
     const { value, checked } = e.target;
@@ -284,22 +273,21 @@ function App() {
     }
   };
 
-  const handleAlphaSymbolSearch = async () => {
+  const handleYahooSymbolSearch = async () => {
     setError("");
-    setAlphaSymbols([]);
-    setAlphaSymbol("");
-    setAlphaCurrency("");
+    setYahooSymbols([]);
+    setYahooSymbol("");
     try {
-      const { data } = await axios.get(`${API_BASE}/alpha-vantage/symbols`, {
-        params: { keywords: alphaSearchQuery.trim() },
+      const { data } = await axios.get(`${API_BASE}/yahoo/symbols`, {
+        params: { keywords: yahooSearchQuery.trim() },
       });
-      setAlphaSymbols(data.symbols);
+      setYahooSymbols(data.symbols);
       if (data.symbols.length === 0)
-        setError("No matching Alpha Vantage symbols found.");
+        setError("No matching NSE/BSE symbols found.");
     } catch (requestError) {
       setError(
         requestError.response?.data?.error ||
-          "Could not search Alpha Vantage symbols.",
+          "Could not search Yahoo Finance symbols.",
       );
     }
   };
@@ -343,10 +331,9 @@ function App() {
         formData.append("simulate_trading", simulateTrading);
         if (simulateTrading) formData.append("initial_capital", initialCapital);
         response = await axios.post(`${API_BASE}/predict`, formData);
-      } else if (source === "alpha") {
-        response = await axios.post(`${API_BASE}/predict/alpha-vantage`, {
-          symbol: alphaSymbol,
-          currency: alphaCurrency,
+      } else if (source === "yahoo") {
+        response = await axios.post(`${API_BASE}/predict/yahoo`, {
+          symbol: yahooSymbol,
           model_type: modelType,
           features,
           train_size: trainSize,
@@ -392,8 +379,7 @@ function App() {
   const providerLabel = results?.instrument?.provider || "";
   const resultCurrency =
     results?.instrument?.currency ||
-    alphaCurrency ||
-    (source === "kite" ? "INR" : "");
+    (source === "csv" ? "" : "INR");
 
   return (
     <div className="app">
@@ -433,11 +419,11 @@ function App() {
             </button>
             <button
               type="button"
-              className={`tab ${source === "alpha" ? "active" : ""}`}
-              aria-pressed={source === "alpha"}
-              onClick={() => setSource("alpha")}
+              className={`tab ${source === "yahoo" ? "active" : ""}`}
+              aria-pressed={source === "yahoo"}
+              onClick={() => setSource("yahoo")}
             >
-              Alpha Vantage
+              Yahoo Finance (NSE/BSE)
             </button>
             <button
               type="button"
@@ -465,32 +451,21 @@ function App() {
                 The file must contain at least Date and Close columns.
               </p>
             </div>
-          ) : source === "alpha" ? (
-            <section className="panel" aria-label="Alpha Vantage data source">
+          ) : source === "yahoo" ? (
+            <section className="panel" aria-label="Yahoo Finance data source">
               <div className="panel-title">
-                Alpha Vantage
-                <span
-                  className={`status-pill ${alphaConfigured ? "ok" : "off"}`}
-                >
-                  {alphaConfigured ? "API key configured" : "API key missing"}
-                </span>
+                Yahoo Finance
+                <span className="status-pill ok">No API key needed</span>
               </div>
-              {!alphaConfigured && (
-                <p className="note">
-                  Add ALPHA_VANTAGE_API_KEY to the repository .env file, then
-                  restart Django.
-                </p>
-              )}
               <div className="row">
                 <div className="field" style={{ flex: "1 1 240px" }}>
                   <label className="field-label">Search stocks</label>
                   <input
-                    value={alphaSearchQuery}
+                    value={yahooSearchQuery}
                     onChange={(e) => {
-                      setAlphaSearchQuery(e.target.value);
-                      setAlphaSymbols([]);
-                      setAlphaSymbol("");
-                      setAlphaCurrency("");
+                      setYahooSearchQuery(e.target.value);
+                      setYahooSymbols([]);
+                      setYahooSymbol("");
                     }}
                     placeholder="Company or ticker, e.g. Reliance"
                   />
@@ -498,54 +473,43 @@ function App() {
                 <button
                   type="button"
                   className="btn"
-                  onClick={handleAlphaSymbolSearch}
-                  disabled={
-                    !alphaConfigured || alphaSearchQuery.trim().length < 2
-                  }
+                  onClick={handleYahooSymbolSearch}
+                  disabled={yahooSearchQuery.trim().length < 2}
                 >
                   Search
                 </button>
               </div>
-              {alphaSymbols.length > 0 && (
+              {yahooSymbols.length > 0 && (
                 <div className="field" style={{ marginTop: "14px" }}>
                   <label className="field-label">Matching stocks</label>
                   <select
-                    value={alphaSymbol}
-                    onChange={(e) => {
-                      const symbol = e.target.value;
-                      setAlphaSymbol(symbol);
-                      const match = alphaSymbols.find(
-                        (item) => item.symbol === symbol,
-                      );
-                      setAlphaCurrency(match?.currency || "");
-                    }}
+                    value={yahooSymbol}
+                    onChange={(e) => setYahooSymbol(e.target.value)}
                     required
                   >
                     <option value="">Select a stock</option>
-                    {alphaSymbols.map((item) => (
-                      <option
-                        key={`${item.symbol}-${item.region}`}
-                        value={item.symbol}
-                      >
-                        {item.name} ({item.region}) - {item.symbol}
+                    {yahooSymbols.map((item) => (
+                      <option key={item.symbol} value={item.symbol}>
+                        {item.name} ({item.exchange}) - {item.symbol}
                       </option>
                     ))}
                   </select>
                 </div>
               )}
-              {alphaSymbol && (
+              {yahooSymbol && (
                 <LivePrice
                   quote={livePrice}
                   loading={liveLoading}
                   error={liveError}
-                  currency={alphaCurrency}
+                  currency="INR"
                   onRefresh={fetchLivePrice}
                 />
               )}
               <p className="note">
-                Search returns matching symbols from Alpha Vantage, not a full
-                downloadable catalog. Daily history is used; limits depend on
-                your plan.
+                Indian equities only (NSE and BSE). Quotes are near real-time
+                during market hours (up to about a 15-minute delay); daily
+                history is used for the analysis. No API key or sign-up is
+                required. Use Zerodha Kite for a truly live price.
               </p>
             </section>
           ) : (
@@ -712,10 +676,24 @@ function App() {
                 value={modelType}
                 onChange={(e) => setModelType(e.target.value)}
               >
-                <option value="Linear Regression">Linear Regression</option>
-                <option value="Random Forest">Random Forest</option>
-                <option value="XGBoost">XGBoost</option>
+                <option value="Ridge Regression">
+                  Ridge Regression (recommended)
+                </option>
+                <option value="Ensemble (Auto)">
+                  Ensemble (Ridge + Trees + Boosting)
+                </option>
+                <option value="LSTM (Colab)">
+                  LSTM (train free on Google Colab)
+                </option>
               </select>
+              {modelType === "LSTM (Colab)" && (
+                <p className="note">
+                  The LSTM is trained on Google Colab (free GPU). Run
+                  colab/train_lstm_nse.py there, then place nse_lstm.keras and
+                  nse_lstm_config.json in the repo models/ folder and restart
+                  Django. Needs Yahoo/Kite data (Open/High/Low/Volume).
+                </p>
+              )}
             </div>
 
             <div className="field">
@@ -824,8 +802,8 @@ function App() {
               loading ||
               (source === "csv"
                 ? !file
-                : source === "alpha"
-                  ? !alphaConfigured || !alphaSymbol.trim()
+                : source === "yahoo"
+                  ? !yahooSymbol.trim()
                   : !kiteConnected || !selectedInstrument)
             }
           >
@@ -874,17 +852,30 @@ function App() {
             {results.metrics && (
               <div style={{ marginBottom: "30px" }}>
                 <h3 className="section-title">Prediction model metrics</h3>
+                <p className="note" style={{ marginTop: 0 }}>
+                  All error metrics are on next-day log returns. Compare RMSE
+                  with the no-change baseline — if the model cannot beat it,
+                  the signal is not usable.
+                </p>
                 <div className="metrics-grid">
                   <div className="stat">
-                    <span className="stat-label">RMSE</span>
+                    <span className="stat-label">RMSE (returns)</span>
                     <span className="stat-value">
-                      {results.metrics.rmse.toFixed(4)}
+                      {results.metrics.rmse.toFixed(6)}
                     </span>
                   </div>
                   <div className="stat">
-                    <span className="stat-label">MAE</span>
+                    <span className="stat-label">Baseline RMSE (no-change)</span>
                     <span className="stat-value">
-                      {results.metrics.mae.toFixed(4)}
+                      {results.metrics.baseline_rmse != null
+                        ? results.metrics.baseline_rmse.toFixed(6)
+                        : "\u2014"}
+                    </span>
+                  </div>
+                  <div className="stat">
+                    <span className="stat-label">MAE (returns)</span>
+                    <span className="stat-value">
+                      {results.metrics.mae.toFixed(6)}
                     </span>
                   </div>
                   <div className="stat">
@@ -893,9 +884,134 @@ function App() {
                       {results.metrics.r2.toFixed(4)}
                     </span>
                   </div>
+                  <div className="stat">
+                    <span className="stat-label">Directional accuracy</span>
+                    <span className="stat-value">
+                      {results.metrics.directional_accuracy != null
+                        ? `${(results.metrics.directional_accuracy * 100).toFixed(1)}%`
+                        : "\u2014"}
+                    </span>
+                  </div>
+                  <div className="stat">
+                    <span className="stat-label">
+                      Baseline direction (always up)
+                    </span>
+                    <span className="stat-value">
+                      {results.metrics.baseline_directional_accuracy != null
+                        ? `${(results.metrics.baseline_directional_accuracy * 100).toFixed(1)}%`
+                        : "\u2014"}
+                    </span>
+                  </div>
                 </div>
+                {results.walk_forward && (
+                  <>
+                    <h3 className="section-title" style={{ marginTop: "18px" }}>
+                      Walk-forward backtest (expanding window)
+                    </h3>
+                    <div className="metrics-grid">
+                      <div className="stat">
+                        <span className="stat-label">Folds</span>
+                        <span className="stat-value">
+                          {results.walk_forward.folds}
+                        </span>
+                      </div>
+                      <div className="stat">
+                        <span className="stat-label">
+                          Directional accuracy (mean)
+                        </span>
+                        <span className="stat-value">
+                          {(
+                            results.walk_forward.directional_accuracy_mean *
+                            100
+                          ).toFixed(1)}
+                          %
+                        </span>
+                      </div>
+                      <div className="stat">
+                        <span className="stat-label">
+                          Directional accuracy (std)
+                        </span>
+                        <span className="stat-value">
+                          {(
+                            results.walk_forward.directional_accuracy_std * 100
+                          ).toFixed(1)}
+                          %
+                        </span>
+                      </div>
+                      <div className="stat">
+                        <span className="stat-label">RMSE (mean)</span>
+                        <span className="stat-value">
+                          {results.walk_forward.rmse_mean.toFixed(6)}
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             )}
+
+            {results.feature_importance &&
+              results.feature_importance.length > 0 && (
+                <div style={{ marginBottom: "30px" }}>
+                  <h3 className="section-title">
+                    Feature importance
+                    {results.model ? ` — ${results.model}` : ""}
+                  </h3>
+                  <p className="note" style={{ marginTop: 0 }}>
+                    Share of the model's signal coming from each feature.
+                    Features are known at time t; the model forecasts the next
+                    day's return.
+                  </p>
+                  {results.feature_importance.map((item) => (
+                    <div
+                      key={item.feature}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                        marginBottom: "6px",
+                      }}
+                    >
+                      <span
+                        style={{
+                          flex: "0 0 140px",
+                          fontSize: "13px",
+                          color: "#cbd5e1",
+                        }}
+                      >
+                        {item.feature}
+                      </span>
+                      <div
+                        style={{
+                          flex: "1 1 auto",
+                          background: "rgba(255,255,255,0.06)",
+                          borderRadius: "4px",
+                          height: "10px",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: `${Math.max(1, item.importance * 100)}%`,
+                            height: "100%",
+                            background: "#4A90E2",
+                          }}
+                        />
+                      </div>
+                      <span
+                        style={{
+                          flex: "0 0 52px",
+                          textAlign: "right",
+                          fontSize: "13px",
+                          color: "#cbd5e1",
+                        }}
+                      >
+                        {(item.importance * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
             {results.trading_metrics &&
               Object.keys(results.trading_metrics).length > 0 && (

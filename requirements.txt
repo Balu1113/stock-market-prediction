@@ -9,3 +9,5 @@ xgboost
 kiteconnect
 python-dotenv
 requests
+yfinance
+# tensorflow  # uncomment only to serve the Colab-trained LSTM (models/nse_lstm.keras)

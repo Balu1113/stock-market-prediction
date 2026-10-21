@@ -38,8 +38,8 @@ python manage.py runserver 8001
 ```
 Before starting Django, put `KITE_API_KEY` and `KITE_API_SECRET` in the repository-root `.env` file. Keep the file private and out of source control. In the frontend, choose **Zerodha Kite**, connect your account, search for an NSE/BSE equity, select a date range and candle interval, then analyze. This integration fetches historical data only and does not place orders.
 
-## Alpha Vantage
-Get an API key from [Alpha Vantage](https://www.alphavantage.co/support/#api-key), add it to the repository-root `.env` as `ALPHA_VANTAGE_API_KEY`, and restart Django. Choose **Alpha Vantage**, search by company or ticker, and select a matching result before analyzing. Alpha Vantage returns search matches rather than a complete global stock catalog. This provider uses daily historical candles; its available history and request limits depend on your plan. The key stays on the backend.
+## Yahoo Finance (NSE/BSE, no API key)
+Choose **Yahoo Finance** to search Indian stocks (NSE and BSE), view a near-real-time quote, and run the analysis on one year of daily candles. Symbols are resolved automatically (`RELIANCE` + NSE becomes `RELIANCE.NS`, BSE becomes `RELIANCE.BO`). No API key or sign-up is required; quotes are near real-time during market hours (up to about a 15-minute delay). Use **Zerodha Kite** instead when you need a truly live price during market hours.
 
 ## Data Format
 The uploaded CSV must contain at least 'Date' and 'Close' columns.

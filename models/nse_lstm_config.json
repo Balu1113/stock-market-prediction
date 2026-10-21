@@ -1,0 +1,50 @@
+{
+  "features": [
+    "LogReturn_10",
+    "ATR_14",
+    "HighLowRange",
+    "OvernightReturn",
+    "VolumeSMA_ratio"
+  ],
+  "lookback": 20,
+  "scaler_mean": [
+    0.0003038609577353798,
+    53.19814924035189,
+    0.019108895516333498,
+    0.0006126565316628988,
+    1.0077174168407186
+  ],
+  "scaler_scale": [
+    0.004403906976895084,
+    68.0485856943714,
+    0.009495576818782256,
+    0.0075643996878461545,
+    0.5588484676177005
+  ],
+  "symbols": [
+    "RELIANCE.NS",
+    "TCS.NS",
+    "INFY.NS",
+    "HDFCBANK.NS",
+    "ICICIBANK.NS",
+    "ITC.NS",
+    "SBIN.NS",
+    "BHARTIARTL.NS",
+    "LT.NS",
+    "HINDUNILVR.NS",
+    "KOTAKBANK.NS",
+    "AXISBANK.NS",
+    "MARUTI.NS",
+    "SUNPHARMA.NS",
+    "TITAN.NS",
+    "ULTRACEMCO.NS",
+    "ASIANPAINT.NS",
+    "BAJFINANCE.NS",
+    "WIPRO.NS",
+    "NTPC.NS"
+  ],
+  "period": "5y",
+  "train_fraction": 0.8,
+  "holdout_rmse": 0.01592042881661055,
+  "holdout_directional_accuracy": 0.5012531328320802
+}

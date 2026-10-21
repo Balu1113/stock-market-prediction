@@ -73,6 +73,60 @@ class TradingStrategy:
         
         return df, self.calculate_performance_metrics()
     
+    def simulate_with_model(
+        self,
+        data: pd.DataFrame,
+        test_index,
+        predicted_returns,
+    ) -> Tuple[pd.DataFrame, Dict]:
+        """Long-only backtest driven by model predictions.
+
+        A predicted positive return for day t means holding from the close of
+        t to the close of t+1; otherwise the model stays in cash.
+        """
+        index = pd.Index(test_index)
+        predicted_returns = np.asarray(predicted_returns, dtype=float)
+        positions = data.index.get_indexer(index)
+        valid = positions >= 0
+        positions = positions[valid]
+        predicted_returns = predicted_returns[valid]
+
+        if len(positions) < 2:
+            return data, self.calculate_performance_metrics()
+
+        closes = data['Close'].to_numpy(dtype=float)
+        equity = self.initial_capital
+        trade_returns = []
+        entry_equity = None
+
+        for i in range(len(positions) - 1):
+            signal_on = predicted_returns[i] > 0
+            daily_return = closes[positions[i + 1]] / closes[positions[i]] - 1.0
+
+            if signal_on:
+                if entry_equity is None:
+                    entry_equity = equity
+                equity *= 1.0 + daily_return
+            elif entry_equity is not None:
+                trade_returns.append(equity / entry_equity - 1.0)
+                entry_equity = None
+
+        if entry_equity is not None:
+            trade_returns.append(equity / entry_equity - 1.0)
+
+        self.capital = equity
+        total_trades = len(trade_returns)
+        profitable = sum(1 for trade_return in trade_returns if trade_return > 0)
+        return data, {
+            'strategy': 'model',
+            'total_trades': total_trades,
+            'profitable_trades': profitable,
+            'total_pnl': float(equity - self.initial_capital),
+            'win_rate': float(profitable / total_trades * 100) if total_trades else 0.0,
+            'avg_return': float(np.mean(trade_returns) * 100) if trade_returns else 0.0,
+            'final_capital': float(equity),
+        }
+
     def calculate_performance_metrics(self) -> Dict:
         """Calculate trading performance metrics."""
         if not self.trade_history:
