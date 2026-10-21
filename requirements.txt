@@ -1,0 +1,11 @@
+django
+djangorestframework
+django-cors-headers
+pandas
+numpy
+scikit-learn
+plotly
+xgboost
+kiteconnect
+python-dotenv
+requests

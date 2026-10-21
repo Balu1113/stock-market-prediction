@@ -28,7 +28,7 @@ class Visualizer:
         ))
 
         # Future predictions
-        future_dates = pd.date_range(
+        future_dates = pd.bdate_range(
             start=historical_data.index[-1] + pd.Timedelta(days=1),
             periods=len(future_predictions)
         )
@@ -43,7 +43,7 @@ class Visualizer:
         fig.update_layout(
             title='Stock Price Prediction',
             xaxis_title='Date',
-            yaxis_title='Price ($)',
+            yaxis_title='Price',
             hovermode='x unified',
             template='plotly_white',
             showlegend=True,

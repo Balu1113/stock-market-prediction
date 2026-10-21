@@ -38,25 +38,31 @@ class DataProcessor:
         signal = macd.ewm(span=9, adjust=False).mean()
         return macd, signal
 
-    def process_data(self, data: pd.DataFrame, features: List[str]) -> pd.DataFrame:
-        """Process data and engineer features."""
+    def add_indicators(self, data: pd.DataFrame, features: List[str]) -> pd.DataFrame:
+        """Engineer indicator columns without dropping any rows."""
         df = data.copy()
-        
+
         if "Moving Average" in features:
             df['MA20'] = self.calculate_moving_average(df)
             df['MA50'] = self.calculate_moving_average(df, window=50)
-        
+
         if "RSI" in features:
             df['RSI'] = self.calculate_rsi(df)
-        
+
         if "MACD" in features:
             df['MACD'], df['Signal'] = self.calculate_macd(df)
-        
+
         # Add basic features
         df['Returns'] = df['Close'].pct_change()
         df['Volatility'] = df['Returns'].rolling(window=20).std()
-        
+
+        return df
+
+    def process_data(self, data: pd.DataFrame, features: List[str]) -> pd.DataFrame:
+        """Process data and engineer features."""
+        df = self.add_indicators(data, features)
+
         # Drop NaN values
         df.dropna(inplace=True)
-        
+
         return df
