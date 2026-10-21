@@ -4,9 +4,15 @@ from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
-SECRET_KEY = 'django-insecure-key'
-DEBUG = True
-ALLOWED_HOSTS = ['*']
+SECRET_KEY = os.environ.get(
+    'DJANGO_SECRET_KEY', 'django-insecure-key-change-me-in-production'
+)
+DEBUG = os.environ.get('DJANGO_DEBUG', 'true').strip().lower() not in ('0', 'false', 'no')
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.environ.get('DJANGO_ALLOWED_HOSTS', '*').split(',')
+    if host.strip()
+]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -48,10 +54,20 @@ TEMPLATES = [
 ]
 
 CORS_ALLOWED_ORIGINS = [
-    'http://localhost:3000',
-    'http://localhost:3001',
+    origin.strip()
+    for origin in os.environ.get(
+        'CORS_ALLOWED_ORIGINS',
+        'http://localhost:3000,http://localhost:3001',
+    ).split(',')
+    if origin.strip()
 ]
 CORS_ALLOW_CREDENTIALS = True
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'api.authentication.CsrfExemptSessionAuthentication',
+    ],
+}
 
 KITE_API_KEY = os.environ.get('KITE_API_KEY', '')
 KITE_API_SECRET = os.environ.get('KITE_API_SECRET', '')

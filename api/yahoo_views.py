@@ -13,7 +13,10 @@ from utils.data_processor import DataProcessor
 YAHOO_SEARCH_URL = 'https://query2.finance.yahoo.com/v1/finance/search'
 SYMBOL_PATTERN = re.compile(r'^[A-Z0-9]{1,15}(\.[A-Z]{2,4})?$')
 ALLOWED_EXCHANGES = {'NSE', 'BSE'}
-ALLOWED_FEATURES = {'Moving Average', 'RSI', 'MACD'}
+ALLOWED_FEATURES = {
+    'Moving Average', 'RSI', 'MACD', 'Bollinger Bands', 'Supertrend',
+    'Stochastic', 'ADX', 'VWAP', 'OBV',
+}
 YAHOO_HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
 
 
@@ -211,7 +214,7 @@ class YahooAnalyzeView(APIView):
             data = DataProcessor().process_data(data, features)
             results = analyze_dataframe(
                 data,
-                model_type=request.data.get('model_type', 'Linear Regression'),
+                model_type=request.data.get('model_type', 'Ridge Regression'),
                 train_size=train_percent / 100,
                 prediction_days=prediction_days,
                 simulate_trading=simulate_trading,

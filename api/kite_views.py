@@ -17,7 +17,10 @@ ALLOWED_INTERVALS = {
     'minute', '3minute', '5minute', '10minute', '15minute',
     '30minute', '60minute', 'day',
 }
-ALLOWED_FEATURES = {'Moving Average', 'RSI', 'MACD'}
+ALLOWED_FEATURES = {
+    'Moving Average', 'RSI', 'MACD', 'Bollinger Bands', 'Supertrend',
+    'Stochastic', 'ADX', 'VWAP', 'OBV',
+}
 
 
 def _kite_client(access_token=None):
@@ -188,7 +191,7 @@ class KiteAnalyzeView(APIView):
             data = DataProcessor().process_data(data, features)
             results = analyze_dataframe(
                 data,
-                model_type=request.data.get('model_type', 'Linear Regression'),
+                model_type=request.data.get('model_type', 'Ridge Regression'),
                 train_size=train_percent / 100,
                 prediction_days=prediction_days,
                 simulate_trading=simulate_trading,

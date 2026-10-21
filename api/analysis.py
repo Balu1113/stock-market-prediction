@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 from rest_framework.exceptions import ValidationError
 from utils.ml_models import StockPredictor, feature_columns_for
+from utils.patterns import detect_patterns
+from utils.scores import compute_score
 from utils.trading_strategy import TradingStrategy
 from utils.visualizer import Visualizer
 
@@ -69,7 +71,8 @@ def analyze_dataframe(
 
     predictor = StockPredictor(model_type=model_type)
     _, _, y_train, y_test, predictions, future_predictions = predictor.train_and_predict(
-        data, train_size=train_size, prediction_days=prediction_days
+        data, train_size=train_size, prediction_days=prediction_days,
+        uncertainty=True,
     )
     metrics = predictor.calculate_metrics(
         y_test, predictor.test_return_predictions
@@ -86,12 +89,42 @@ def analyze_dataframe(
 
     walk_forward = walk_forward_backtest(data, model_type=model_type)
 
-    figure = Visualizer().plot_predictions(data, predictions, future_predictions)
+    future_lower = future_upper = None
+    if predictor.band_models is not None:
+        try:
+            future_lower, future_upper = predictor.forecast_future_bands(
+                data, feature_columns, prediction_days
+            )
+        except Exception:
+            future_lower = future_upper = None
+
+    figure = Visualizer().plot_predictions(
+        data, predictions, future_predictions,
+        future_lower=future_lower, future_upper=future_upper,
+    )
     last_date = data.index[-1]
     future_index = pd.bdate_range(
         start=last_date + pd.Timedelta(days=1), periods=prediction_days
     )
     future_dates = [str(date.date()) for date in future_index]
+
+    last_close = float(data['Close'].iloc[-1])
+    next_day_return = (
+        float(future_predictions[0]) / last_close - 1.0
+        if len(future_predictions) and last_close
+        else None
+    )
+    patterns = detect_patterns(data)
+    score = compute_score(data, predicted_return=next_day_return)
+
+    future_block = {
+        'dates': future_dates,
+        'values': future_predictions.tolist(),
+    }
+    if future_lower is not None and future_upper is not None:
+        # Keep the band path consistent with the median path's last close.
+        future_block['lower'] = np.asarray(future_lower, dtype=float).tolist()
+        future_block['upper'] = np.asarray(future_upper, dtype=float).tolist()
 
     return {
         'model': model_type,
@@ -100,8 +133,10 @@ def analyze_dataframe(
         'walk_forward': walk_forward,
         'trading_metrics': trading_metrics,
         'plot': figure.to_json(),
-        'future_predictions': {
-            'dates': future_dates,
-            'values': future_predictions.tolist(),
-        },
+        'future_predictions': future_block,
+        'patterns': patterns,
+        'score': score,
+        'next_day_return_pct': (
+            round(next_day_return * 100, 3) if next_day_return is not None else None
+        ),
     }

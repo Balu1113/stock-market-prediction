@@ -63,6 +63,8 @@ class StockPredictor:
         self.test_return_predictions = None
         self.test_actual_returns = None
         self.test_close = None
+        self.band_models = None
+        self.test_return_bands = None
 
     def _build_tree_model(self):
         """Trees regularized for small, noisy financial datasets."""
@@ -168,13 +170,27 @@ class StockPredictor:
         return None
 
     def _indicator_features(self, columns) -> list:
+        mapping = (
+            ('MA20', 'Moving Average'),
+            ('MA50', 'Moving Average'),
+            ('RSI', 'RSI'),
+            ('MACD', 'MACD'),
+            ('Signal', 'MACD'),
+            ('BB_pctb', 'Bollinger Bands'),
+            ('BB_width', 'Bollinger Bands'),
+            ('Supertrend_dist', 'Supertrend'),
+            ('Supertrend_dir', 'Supertrend'),
+            ('Stoch_K', 'Stochastic'),
+            ('Stoch_D', 'Stochastic'),
+            ('ADX', 'ADX'),
+            ('ADX_DI_diff', 'ADX'),
+            ('Close_VWAP_ratio', 'VWAP'),
+            ('OBV_change_5', 'OBV'),
+        )
         features = []
-        if 'MA20' in columns:
-            features.append('Moving Average')
-        if 'RSI' in columns:
-            features.append('RSI')
-        if 'MACD' in columns:
-            features.append('MACD')
+        for column, feature in mapping:
+            if column in columns and feature not in features:
+                features.append(feature)
         return features
 
     def _build_supervised(self, data: pd.DataFrame, feature_columns: list) -> pd.DataFrame:
@@ -185,13 +201,34 @@ class StockPredictor:
         frame.dropna(inplace=True)
         return frame
 
-    def _forecast_future(self, data, feature_columns, prediction_days):
+    def _fit_band_models(self, X_train, y_train):
+        """Quantile gradient-boosting band models (10th/90th) for uncertainty."""
+        bands = {}
+        for alpha in (0.1, 0.9):
+            model = GradientBoostingRegressor(
+                loss='quantile',
+                alpha=alpha,
+                n_estimators=120,
+                learning_rate=0.05,
+                max_depth=3,
+                subsample=0.8,
+                random_state=42,
+            )
+            model.fit(X_train, y_train)
+            bands[alpha] = model
+        return bands
+
+    def _forecast_future(self, data, feature_columns, prediction_days, predict_fn=None):
         """Recursively forecast future closes from predicted log returns."""
         processor = DataProcessor()
         indicator_features = self._indicator_features(data.columns)
         history = data.copy()
         future_predictions = []
         last_date = history.index[-1]
+        if predict_fn is None:
+            def predict_fn(row):
+                scaled = self.scaler.transform(row)
+                return float(self.model.predict(scaled)[0])
 
         for _ in range(prediction_days):
             rebuilt = processor.add_indicators(history, indicator_features)
@@ -201,8 +238,7 @@ class StockPredictor:
             if row.isna().any(axis=None):
                 predicted_close = previous_close
             else:
-                scaled = self.scaler.transform(row)
-                predicted_return = float(self.model.predict(scaled)[0])
+                predicted_return = predict_fn(row)
                 predicted_close = previous_close * float(np.exp(predicted_return))
             future_predictions.append(predicted_close)
 
@@ -313,7 +349,8 @@ class StockPredictor:
         )
 
     def train_and_predict(
-        self, data: pd.DataFrame, train_size: float = 0.8, prediction_days: int = 7
+        self, data: pd.DataFrame, train_size: float = 0.8, prediction_days: int = 7,
+        uncertainty: bool = False,
     ) -> tuple:
         """Train model and predict next-day returns without lookahead leakage."""
         if self.model_type == 'LSTM (Colab)':
@@ -359,6 +396,12 @@ class StockPredictor:
             data, feature_columns, prediction_days
         )
 
+        if uncertainty:
+            self.band_models = self._fit_band_models(X_train, y_train)
+            low_test = self.band_models[0.1].predict(X_test)
+            high_test = self.band_models[0.9].predict(X_test)
+            self.test_return_bands = (low_test, high_test)
+
         return (
             X_train,
             X_test,
@@ -367,6 +410,24 @@ class StockPredictor:
             predictions,
             np.array(future_predictions),
         )
+
+    def forecast_future_bands(self, data, feature_columns, prediction_days):
+        """Recursive 10th/90th percentile future paths (call after train)."""
+        if not self.band_models:
+            return None, None
+        low = self._forecast_future(
+            data, feature_columns, prediction_days,
+            predict_fn=lambda row: float(
+                self.band_models[0.1].predict(self.scaler.transform(row))[0]
+            ),
+        )
+        high = self._forecast_future(
+            data, feature_columns, prediction_days,
+            predict_fn=lambda row: float(
+                self.band_models[0.9].predict(self.scaler.transform(row))[0]
+            ),
+        )
+        return np.array(low), np.array(high)
 
     def calculate_metrics(self, y_true: np.ndarray, y_pred: np.ndarray) -> dict:
         """Metrics on next-day log returns, with a naive no-change baseline."""

@@ -12,7 +12,7 @@ class PredictView(APIView):
             if not file:
                 return Response({'error': 'No file uploaded'}, status=status.HTTP_400_BAD_REQUEST)
             
-            model_type = request.data.get('model_type', 'Linear Regression')
+            model_type = request.data.get('model_type', 'Ridge Regression')
             features = request.data.getlist('features[]')
             train_size = float(request.data.get('train_size', 80)) / 100
             prediction_days = int(request.data.get('prediction_days', 7))
